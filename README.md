@@ -1,4 +1,4 @@
-# Contolre the speed acceleration of a Stepper motor using Raspberry Pi 5
+# Control the speed acceleration of a Stepper motor using Raspberry Pi 5
 
 Script to control a stepper motor using Raspberry Pi 5, the code has 3 phases:
 - acceleration (increasing the speed)
