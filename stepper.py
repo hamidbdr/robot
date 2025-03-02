@@ -15,7 +15,7 @@ def set_direction(clockwise):
     DIR_PIN.value = clockwise  # True for CW, False for CCW
 
 # Function to send steps
-def move_steps_with_rpm(steps, delay):
+def move_steps(steps, delay):
     for step in range(steps):
         STEP_PIN.on()
         time.sleep(delay)  # High pulse
@@ -34,12 +34,12 @@ try:
         set_direction(True)  # Set direction clockwise
 
         print(f"Cycle {i + 1}: Clockwise")
-        move_steps_with_rpm(steps, step_delay)  # Move steps with RPM calculation
+        move_steps(steps, step_delay)  # Move steps
         time.sleep(0.5)
 
         set_direction(False)  # Change direction to counterclockwise
         print(f"Cycle {i + 1}: Counterclockwise")
-        move_steps_with_rpm(steps, step_delay, steps_per_revolution)  # Move steps with RPM calculation
+        move_steps(steps, step_delay)  # Move steps 
 
         time.sleep(0.5)
 
