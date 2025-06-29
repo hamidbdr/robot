@@ -136,7 +136,7 @@ class MotorController:
 limit_switch_1 = Button(6, pull_up=True, bounce_time=0.0005)
 limit_switch_2 = Button(12, pull_up=True, bounce_time=0.0005)
 
-motor1 = StepperMotor(dir_pin=23, step_pin=17, enable_pin=22, motor_id=1)
+motor1 = StepperMotor(dir_pin=27, step_pin=17, enable_pin=22, motor_id=1)
 motor2 = StepperMotor(dir_pin=26, step_pin=16, enable_pin=25, motor_id=2)
 
 # Attach limit switches (optional)
@@ -144,17 +144,17 @@ motor2.attach_limit_switch(limit_switch_1)
 motor2.attach_limit_switch(limit_switch_2)
 
 # Create a motor controller
-controller = MotorController(motors=[motor1, motor2])
+controller = MotorController(motors=[motor1])
 
-angle = 180
+angle = 5
 numb_full_rota = angle / 360
 reduction_factor = 9.5
 micro_stepping = 4
 steps_per_revolution = micro_stepping * 200
 steps_motor = int(steps_per_revolution * numb_full_rota * reduction_factor)
 
-rpm_start = 20
-rpm_max = 150
+rpm_start = 2
+rpm_max = 20
 accel_fraction = 0.1
 decel_fraction = 0.1
 rpm_min = 1
@@ -165,23 +165,24 @@ try:
     controller.enable_all()
     for i in range(40):
         print(f"Iteration number {i} {i % 2 }{motor1.dir_pin}{not motor1.dir_pin.value}")
-        
+        #motor1.set_direction(True)  # Set clockwise if currently 0 (False)
+
         # Change direction of motor1 periodically (every 10 iterations for example)
-        if i % 10 == 0:  # Change direction every 10 iterations
+        if i % 2 == 0:  # Change direction every 10 iterations
             # Toggle direction based on current value
-            current_direction = motor1.dir_pin.value
-            motor1.set_direction(clockwise=current_direction == 0)  # Set clockwise if currently 0 (False)
+            print(motor1.dir_pin.value)
+            motor1.set_direction(False)  # Set clockwise if currently 0 (False)
             print(f"Motor 1 direction changed at iteration {i} to {'CW' if motor1.dir_pin.value else 'CCW'}")
-        
+            
         # Before starting motor2, check the limit switches and set direction
-        motor2.check_limit_switches()
+        ##motor2.check_limit_switches()
 
         controller.move_all(steps_motor, steps_per_revolution, rpm_start, rpm_max, accel_fraction, decel_fraction, rpm_min)
 
         # Check if motor2 stopped due to limit switch
-        if motor2.stop_flag.is_set():
-            print("Motor 2 stopped by limit switch.")
-            motor2.reset_after_stop()
+        #if motor2.stop_flag.is_set():
+        #    print("Motor 2 stopped by limit switch.")
+        #    motor2.reset_after_stop()
 
         time.sleep(1)
 

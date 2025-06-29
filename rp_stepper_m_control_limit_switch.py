@@ -3,14 +3,14 @@ import time
 import threading
 
 # Define pins for stepper motor 1
-DIR_PIN_1 = OutputDevice(23)
+DIR_PIN_1 = OutputDevice(27)
 STEP_PIN_1 = OutputDevice(17)
 ENABLE_PIN_1 = OutputDevice(22)
 
 # Define pins for stepper motor 2
-DIR_PIN_2 = OutputDevice(26)
+DIR_PIN_2 = OutputDevice(20)
 STEP_PIN_2 = OutputDevice(16)
-ENABLE_PIN_2 = OutputDevice(25)
+ENABLE_PIN_2 = OutputDevice(21)
 
 # Limit switch pin (use Button instead of InputDevice)
 LIMIT_SWITCH = Button(12, pull_up=True)
@@ -92,9 +92,9 @@ def move_steps_motor(steps, steps_per_revolution, rpm_start, rpm_max, accel_frac
 
 def move_both_motors(steps, steps_per_revolution, rpm_start, rpm_max, accel_fraction, decel_fraction, rpm_min):
     thread_motor1 = threading.Thread(target=move_steps_motor,
-                                     args=(steps, steps_per_revolution, rpm_start, rpm_max, accel_fraction, decel_fraction, rpm_min, stop_flag, STEP_PIN_1, 1))
+                                     args=(1*steps, steps_per_revolution, rpm_start, rpm_max, accel_fraction, decel_fraction, rpm_min, stop_flag, STEP_PIN_1, 1))
     thread_motor2 = threading.Thread(target=move_steps_motor,
-                                      args=(steps, steps_per_revolution, rpm_start, rpm_max, accel_fraction, decel_fraction, rpm_min, stop_flag, STEP_PIN_2, 2))
+                                      args=(4*steps, steps_per_revolution, rpm_start, 1*rpm_max, accel_fraction/1, decel_fraction/1, rpm_min, stop_flag, STEP_PIN_2, 2))
 
     thread_motor1.start()
     thread_motor2.start()
@@ -117,48 +117,35 @@ LIMIT_SWITCH.when_released = limit_switch_released
 
 # Main execution
 try:
-    angle = 360
+    angle = 40
     numb_full_rota = angle / 360
     reduction_factor = 9.5
-    micro_stepping = 4
+    micro_stepping = 32
     steps_per_revolution = micro_stepping * 200
 
     steps_motor = int(steps_per_revolution * numb_full_rota * reduction_factor)
 
-    rpm_start = 50
-    rpm_max = 400
-    accel_fraction = 0.2
-    decel_fraction = 0.2
-    rpm_min = 1
+    rpm_start = 0.5
+    rpm_max = 37
+    accel_fraction = 0.005
+
+    decel_fraction = 0.005
+    rpm_min = 0.5
 
     enable_motors()
-    for i in range(40):
+    for i in range(4):
         print(f"iteration number {i}")
-        if stop_flag.is_set():
-            print("Limit switch triggered. Waiting before resetting...")
-            stop_flag.clear()
-            print("Stop flag cleared. Continuing with the next movement.")
 
         set_directions(clockwise_motor1=True, clockwise_motor2=True)
+
         move_both_motors(steps_motor, steps_per_revolution, rpm_start, rpm_max, accel_fraction, decel_fraction, rpm_min)
 
-        time.sleep(1)
+        time.sleep(0.05)
 
-        # Clear stop flag if it was set by the limit switch
-        if stop_flag.is_set():
-            print("Limit switch triggered. Waiting before resetting...")
-            stop_flag.clear()
-            print("Stop flag cleared. Continuing with the next movement.")
-        
-        time.sleep(1)  # Delay before clearing
-
-                
-        set_directions(clockwise_motor1=False, clockwise_motor2=False)
+        set_directions(clockwise_motor1=False, clockwise_motor2=False)                
         move_both_motors(steps_motor, steps_per_revolution, rpm_start, rpm_max, accel_fraction, decel_fraction, rpm_min)
-        if stop_flag.is_set():
-            print("Limit switch triggered. Waiting before resetting...")
-            stop_flag.clear()
-            print("Stop flag cleared. Continuing with the next movement.")
+
 finally:
-    disable_motors()
-    print("Motors disabled!")
+    #disable_motors()
+    #print("Motors disabled!")
+    print("done")

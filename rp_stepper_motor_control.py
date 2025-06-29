@@ -129,16 +129,16 @@ def plots_with_labels(time_data_all, rpm_data_all, delay_data_all):
 # Main execution
 try:
     # Parameters
-    numb_full_rota = 0.3
+    numb_full_rota = 0.1
     reduction_factor = 9.5
-    micro_stepping = 4
+    micro_stepping = 2
     steps_per_revolution = micro_stepping * 200
 
     steps = int(steps_per_revolution * numb_full_rota * reduction_factor)
-    rpm_start = 50
-    rpm_max = 350
-    acceleration_fraction = 0.3
-    deceleration_fraction = 0.2
+    rpm_start = 5
+    rpm_max = 40
+    acceleration_fraction = 0.1
+    deceleration_fraction = 0.1
     hold_fraction = 1 - (acceleration_fraction + deceleration_fraction)
 
     enable_motor()
@@ -168,7 +168,7 @@ try:
 
         print(f"Starting counterclockwise motion (iteration {i+1})...")
         
-        time.sleep(0.1)
+        time.sleep(0.5)
 
         set_direction(False)
         time_data, rpm_data, delay_data = move_steps_with_linear_rpm(
