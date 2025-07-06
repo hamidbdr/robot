@@ -22,8 +22,8 @@ class StepperMotorController:
         
         # Motor specifications
         self.motor_specs = {
-            1: {'microstepping': 32, 'reduction': 9.5, 'max_rpm': 8},
-            2: {'microstepping': 32, 'reduction': 9.5, 'max_rpm': 8},
+            1: {'microstepping': 32, 'reduction': 36.5, 'max_rpm': 500},
+            2: {'microstepping': 32, 'reduction': 36.5, 'max_rpm': 500},
             3: {'microstepping': 4, 'reduction': 9.5, 'max_rpm': 50},
             4: {'microstepping': 8, 'reduction': 6.5, 'max_rpm': 50},
             5: {'microstepping': 16, 'reduction': 6.5, 'max_rpm': 50},
@@ -38,8 +38,8 @@ class StepperMotorController:
         
         # Safety limits (degrees)
         self.angle_limits = {
-            1: (-25, 25),
-            2: (-25, 25),
+            1: (-100, 10),
+            2: (-15, 60),
             3: (-100, 100),
             4: (-160, 160),
             5: (-160, 160),
@@ -337,11 +337,11 @@ if __name__ == "__main__":
         # Example 2: Individual RPM profiles for each motor
         individual_rpm_profiles = [
             # Motor 1 - slow and steady
-            {'start': 0.5, 'max': 5, 'min': 0.5, 'accel_fraction': 0.1, 'decel_fraction': 0.1},
+            {'start': 0.5, 'max': 250, 'min': 0.5, 'accel_fraction': 0.2, 'decel_fraction': 0.2},
             # Motor 2 - slow and steady
-            {'start': 0.5, 'max': 5, 'min': 0.5, 'accel_fraction': 0.1, 'decel_fraction': 0.1},
+            {'start': 0.5, 'max': 250, 'min': 0.5, 'accel_fraction': 0.2, 'decel_fraction': 0.2},
             # Motor 3 - fast
-            {'start': 1.0, 'max': 40, 'min': 0.5, 'accel_fraction': 0.3, 'decel_fraction': 0.3},
+            {'start': 1.0, 'max': 40, 'min': 0.5, 'accel_fraction': 0.3, 'decel_fraction': 0.2},
             # Motor 4 - medium speed
             {'start': 0.8, 'max': 80, 'min': 0.5, 'accel_fraction': 0.2, 'decel_fraction': 0.2},
             # Motor 5 - medium speed
@@ -353,15 +353,19 @@ if __name__ == "__main__":
         # Test sequence - focusing on motors 2-6 with safe angles
         test_sequence = [
             [0, 0, 0, 0, 0, 0],           # Home position
-            [0, 0, 45, 45, 45, 45],          # Test motor 5
+            [-70, 0, 0, 0, 0, 0],           # Home position
+            [0, 0, 0, 0, 0, 0],           # Home position
+            [0, 50, 0, 0, 0, 0],           # Home position
+            [0, 0, 0, 0, 0, 0],           # Home position
+            [-60, 30, 45, 45, 45, 45],          # Test motor 5
             [0, 0, 0, 0, 0, 0],           # Return home
-            [-5, 5, -15, 20, 45, 90],      # Combined movement
+            [-30, 20, -15, 20, 45, 90],      # Combined movement
             [0, 0, 0, 0, 0, 0],           # Return home
             [0, 0, 45, 0, 0, 0],          # Test motor 3
             [0, 0, 0, 0, 0, 0],           # Return home
             [0, 0, -60, 90, 0, 0],          # Test motor 4
             [0, 0, 0, 0, 0, 0],           # Return home
-            [0, 0, -60, 90, 90, 90],          # Test motor 6
+            [-55, 35, -60, 90, 90, 90],          # Test motor 6
             [0, 0, 0, 0, 0, 0]            # Return home
         ]
         
