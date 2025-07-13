@@ -16,15 +16,15 @@ class StepperMotorController:
             2: {'dir': OutputDevice(25), 'step': OutputDevice(12)},
             1: {'dir': OutputDevice(6), 'step': OutputDevice(4)},
             5: {'dir': OutputDevice(13), 'step': OutputDevice(17)},
-            6: {'dir': OutputDevice(19), 'step': OutputDevice(27)},
+            6: {'dir': OutputDevice(5), 'step': OutputDevice(27)},
             4: {'dir': OutputDevice(26), 'step': OutputDevice(22)}
         }
         
         # Motor specifications
         self.motor_specs = {
-            2: {'microstepping': 32, 'reduction': 36.5, 'max_rpm': 500},
-            3: {'microstepping': 32, 'reduction': 36.5, 'max_rpm': 500},
-            1: {'microstepping': 4, 'reduction': 9.5, 'max_rpm': 50},
+            2: {'microstepping': 16, 'reduction': 36.5, 'max_rpm': 500},
+            3: {'microstepping': 16, 'reduction': 36.5, 'max_rpm': 500},
+            1: {'microstepping': 16, 'reduction': 9.5, 'max_rpm': 50},
             5: {'microstepping': 8, 'reduction': 6.5, 'max_rpm': 50},
             6: {'microstepping': 16, 'reduction': 6.5, 'max_rpm': 50},
             4: {'microstepping': 8, 'reduction': 6.5, 'max_rpm': 50}
@@ -335,20 +335,19 @@ if __name__ == "__main__":
         }
         
         # Example 2: Individual RPM profiles for each motor
-        individual_rpm_profiles = [
-            # Motor 1 - slow and steady
-            {'start': 0.5, 'max': 250, 'min': 0.5, 'accel_fraction': 0.2, 'decel_fraction': 0.2},
-            # Motor 2 - slow and steady
-            {'start': 0.5, 'max': 250, 'min': 0.5, 'accel_fraction': 0.2, 'decel_fraction': 0.2},
-            # Motor 3 - fast
-            {'start': 1.0, 'max': 40, 'min': 0.5, 'accel_fraction': 0.3, 'decel_fraction': 0.2},
-            # Motor 4 - medium speed
-            {'start': 0.8, 'max': 40, 'min': 0.5, 'accel_fraction': 0.2, 'decel_fraction': 0.2},
-            # Motor 5 - medium speed
-            {'start': 0.8, 'max': 40, 'min': 0.5, 'accel_fraction': 0.2, 'decel_fraction': 0.2},
-            # Motor 6 - fast
-            {'start': 1.0, 'max': 80, 'min': 0.5, 'accel_fraction': 0.2, 'decel_fraction': 0.2}
-        ]
+        individual_rpm_profiles = [  # Motor 1: Max 40 RPM
+        {'start': 0.5, 'max': 40, 'min': 0.5, 'accel_fraction': 0.3, 'decel_fraction': 0.3},
+        # Motor 2: Max 250 RPM
+        {'start': 0.5, 'max': 250, 'min': 0.5, 'accel_fraction': 0.3, 'decel_fraction': 0.2},
+        # Motor 3: Max 250 RPM
+        {'start': 0.5, 'max': 250, 'min': 0.5, 'accel_fraction': 0.3, 'decel_fraction': 0.2},
+        # Motor 4: Max 80 RPM
+        {'start': 0.5, 'max': 40, 'min': 0.5, 'accel_fraction': 0.2, 'decel_fraction': 0.2},
+        # Motor 5: Max 80 RPM
+        {'start': 0.5, 'max': 40, 'min': 0.5, 'accel_fraction': 0.2, 'decel_fraction': 0.2},
+        # Motor 6: Max 80 RPM
+        {'start': 0.5, 'max': 40, 'min': 0.5, 'accel_fraction': 0.3, 'decel_fraction': 0.3}
+          ]
            
         # Test sequence - focusing on motors 2-6 with safe angles
         test_sequence = [

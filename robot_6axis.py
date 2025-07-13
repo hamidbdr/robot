@@ -17,7 +17,7 @@ class StepperMotorController:
             2: {'dir': OutputDevice(25), 'step': OutputDevice(12)},
             1: {'dir': OutputDevice(6), 'step': OutputDevice(4)},
             5: {'dir': OutputDevice(13), 'step': OutputDevice(17)},
-            6: {'dir': OutputDevice(19), 'step': OutputDevice(27)},
+            6: {'dir': OutputDevice(5), 'step': OutputDevice(27)},
             4: {'dir': OutputDevice(26), 'step': OutputDevice(22)}
         }
         
@@ -25,7 +25,7 @@ class StepperMotorController:
         self.motor_specs = {
             2: {'microstepping': 16, 'reduction': 36.5, 'max_rpm': 500},
             3: {'microstepping': 16, 'reduction': 36.5, 'max_rpm': 500},
-            1: {'microstepping': 4, 'reduction': 9.5, 'max_rpm': 50},
+            1: {'microstepping': 16, 'reduction': 9.5, 'max_rpm': 50},
             5: {'microstepping': 8, 'reduction': 6.5, 'max_rpm': 50},
             6: {'microstepping': 16, 'reduction': 6.5, 'max_rpm': 50},
             4: {'microstepping': 8, 'reduction': 6.5, 'max_rpm': 50}
@@ -46,6 +46,51 @@ class StepperMotorController:
             5: (-15, 100),   # Motor 5 index 4
             6: (-90, 90)     # Motor 6 index 5
         }
+    
+    def get_adaptive_rpm_profile(self, angle_diff, motor_id):
+        """Generate RPM profile based on movement size, respecting individual motor max_rpm."""
+        abs_angle = abs(angle_diff)
+        
+        # Get the individual motor's maximum RPM from specs
+        motor_max_rpm = self.motor_specs[motor_id]['max_rpm']
+
+        # Base profiles for different movement sizes
+        if abs_angle < 1.0:  # Very small movements
+            return {
+                'start': 0.2,
+                # Use motor_max_rpm, but cap it for very small movements if desired
+                'max': min(2, motor_max_rpm),
+                'min': 0.2,
+                'accel_fraction': 0.1,  # More gradual acceleration
+                'decel_fraction': 0.1
+            }
+        elif abs_angle < 5.0:  # Small movements
+            return {
+                'start': 0.5,
+                # Use motor_max_rpm, but cap it for small movements if desired
+                'max': min(15, motor_max_rpm),
+                'min': 0.3,
+                'accel_fraction': 0.1,
+                'decel_fraction': 0.1
+            }
+        elif abs_angle < 15.0:  # Medium movements
+            return {
+                'start': 1.0,
+                # Use motor_max_rpm, but cap it for medium movements if desired
+                'max': min(25, motor_max_rpm),
+                'min': 0.5,
+                'accel_fraction': 0.2,
+                'decel_fraction': 0.2
+            }
+        else:  # Large movements
+            return {
+                'start': 1.0,
+                # Use the actual motor_max_rpm for large movements
+                'max': motor_max_rpm, # Directly use the motor's max RPM
+                'min': 0.8,
+                'accel_fraction': 0.15,
+                'decel_fraction': 0.15
+            }
         
     def generate_random_angles(self, num_positions=1):
         """Generate random angles within safe limits for all motors"""
@@ -62,27 +107,6 @@ class StepperMotorController:
             random_positions.append(angles)
         
         return random_positions if num_positions > 1 else random_positions[0]
-    
-    def generate_random_test_sequence(self, num_movements=10, include_home=True):
-        """Generate a random test sequence with optional home returns"""
-        sequence = []
-        
-        # Always start at home
-        sequence.append([0.0] * 6)
-        
-        for i in range(num_movements):
-            # Generate random position
-            random_angles = self.generate_random_angles()
-            sequence.append(random_angles)
-            
-            # Optionally return to home between movements
-            if include_home and i < num_movements - 1:
-                sequence.append([0.0] * 6)
-        
-        # Always end at home
-        sequence.append([0.0] * 6)
-        
-        return sequence
     
     def print_angle_constraints(self):
         """Print the angle constraints for all motors"""
@@ -135,7 +159,7 @@ class StepperMotorController:
         return 60.0 / (2.0 * rpm * steps_per_revolution)  # Factor of 2 for on/off cycle
     
     def move_motor_steps(self, motor_id, steps, motor_rpm_profile):
-        """Move a single motor with acceleration profile"""
+        """Improved motor movement with minimum step enforcement"""
         if steps == 0:
             return
             
@@ -145,19 +169,33 @@ class StepperMotorController:
         # Use motor-specific max RPM, limited by hardware specs
         max_rpm = min(motor_rpm_profile['max'], self.motor_specs[motor_id]['max_rpm'])
         
-        # Calculate acceleration phases
-        accel_steps = int(abs(steps) * motor_rpm_profile['accel_fraction'])
-        decel_steps = int(abs(steps) * motor_rpm_profile['decel_fraction'])
+        # Ensure minimum steps for acceleration phases
+        min_accel_steps = 5  # Minimum steps for smooth acceleration
+        min_decel_steps = 5
+        
+        # Calculate acceleration phases with minimums
+        accel_steps = max(min_accel_steps, int(abs(steps) * motor_rpm_profile['accel_fraction']))
+        decel_steps = max(min_decel_steps, int(abs(steps) * motor_rpm_profile['decel_fraction']))
+        
+        # Adjust if total accel+decel exceeds available steps
+        if accel_steps + decel_steps > abs(steps):
+            ratio = abs(steps) / (accel_steps + decel_steps)
+            accel_steps = int(accel_steps * ratio)
+            decel_steps = int(decel_steps * ratio)
+        
         const_steps = abs(steps) - accel_steps - decel_steps
+        
+        logger.debug(f"Motor {motor_id}: {steps} steps, accel:{accel_steps}, const:{const_steps}, decel:{decel_steps}")
         
         step_count = 0
         
-        # Acceleration phase
+        # Acceleration phase with smoother ramping
         for i in range(accel_steps):
             if self.stop_flag.is_set():
                 return
                 
-            progress = i / accel_steps if accel_steps > 0 else 1
+            # Use smoother acceleration curve (quadratic instead of linear)
+            progress = (i / accel_steps) ** 0.5 if accel_steps > 0 else 1
             rpm = motor_rpm_profile['start'] + (max_rpm - motor_rpm_profile['start']) * progress
             rpm = max(rpm, motor_rpm_profile['min'])
             
@@ -181,12 +219,13 @@ class StepperMotorController:
             time.sleep(delay)
             step_count += 1
         
-        # Deceleration phase
+        # Deceleration phase with smoother ramping
         for i in range(decel_steps):
             if self.stop_flag.is_set():
                 return
                 
-            progress = i / decel_steps if decel_steps > 0 else 1
+            # Use smoother deceleration curve
+            progress = (i / decel_steps) ** 0.5 if decel_steps > 0 else 1
             rpm = max_rpm - (max_rpm - motor_rpm_profile['min']) * progress
             rpm = max(rpm, motor_rpm_profile['min'])
             
@@ -200,29 +239,8 @@ class StepperMotorController:
         
         logger.debug(f"Motor {motor_id} completed {step_count} steps at max {max_rpm} RPM")
     
-    def move_to_angles(self, target_angles, rpm_profiles=None):
-        """Move all motors to target angles with coordinated motion"""
-        # Default profile if none provided
-        default_profile = {
-            'start': 0.5,
-            'max': 10,
-            'min': 0.5,
-            'accel_fraction': 0.1,
-            'decel_fraction': 0.1
-        }
-        
-        # Handle rpm_profiles parameter
-        if rpm_profiles is None:
-            motor_profiles = [default_profile.copy() for _ in range(6)]
-        elif isinstance(rpm_profiles, dict):
-            motor_profiles = [rpm_profiles.copy() for _ in range(6)]
-        elif isinstance(rpm_profiles, list):
-            if len(rpm_profiles) != 6:
-                raise ValueError("rpm_profiles list must contain exactly 6 profiles")
-            motor_profiles = rpm_profiles
-        else:
-            raise ValueError("rpm_profiles must be a dict or list of 6 dicts")
-        
+    def move_to_angles_adaptive(self, target_angles, override_profiles=None, min_movement_threshold=0.1):
+        """Move with adaptive speed profiles based on movement size"""
         with self.movement_lock:
             if self.is_moving:
                 logger.warning("Movement already in progress")
@@ -235,11 +253,41 @@ class StepperMotorController:
                 
                 # Calculate movements
                 angle_diffs = [target_angles[i] - self.current_angles[i] for i in range(6)]
+                
+                # Filter out tiny movements that cause jitter
+                significant_movements = []
+                for i, diff in enumerate(angle_diffs):
+                    if abs(diff) < min_movement_threshold:
+                        angle_diffs[i] = 0  # Skip this motor
+                        significant_movements.append(False)
+                    else:
+                        significant_movements.append(True)
+                
                 steps_list = [self.angle_to_steps(abs(diff), i+1) for i, diff in enumerate(angle_diffs)]
                 directions = [diff >= 0 for diff in angle_diffs]
                 
+                # Check if any significant movement is needed
+                if not any(significant_movements):
+                    logger.info("No significant movements needed (all angles within threshold)")
+                    return True
+                
+                # Generate adaptive profiles or use override
+                if override_profiles is None:
+                    motor_profiles = [
+                        self.get_adaptive_rpm_profile(angle_diffs[i], i+1) 
+                        for i in range(6)
+                    ]
+                else:
+                    # Validate that override_profiles is a list of 6 dictionaries
+                    if not (isinstance(override_profiles, list) and len(override_profiles) == 6 and
+                            all(isinstance(p, dict) for p in override_profiles)):
+                        raise ValueError("override_profiles must be a list of 6 dictionaries")
+                    motor_profiles = override_profiles
+                
                 logger.info(f"Moving to: {[f'M{i+1}:{target_angles[i]:.1f}°' for i in range(6)]}")
-                logger.info(f"Steps: {[f'M{i+1}:{steps_list[i]}' for i in range(6)]}")
+                logger.info(f"Angle diffs: {[f'M{i+1}:{angle_diffs[i]:.1f}°' for i in range(6)]}")
+                max_rpms = [f"M{i+1}:{min(motor_profiles[i]['max'], self.motor_specs[i+1]['max_rpm'])}" for i in range(6)]
+                logger.info(f"Max RPMs: {max_rpms}")
                 
                 self.set_directions(directions)
                 
@@ -274,22 +322,6 @@ class StepperMotorController:
             finally:
                 self.is_moving = False
     
-    def move_sequence(self, angle_sequence, rpm_profiles=None, pause_between=0.5):
-        """Execute a sequence of movements"""
-        logger.info(f"Starting sequence of {len(angle_sequence)} movements")
-        
-        for i, angles in enumerate(angle_sequence):
-            logger.info(f"--- Movement {i+1}/{len(angle_sequence)} ---")
-            
-            if not self.move_to_angles(angles, rpm_profiles):
-                logger.error(f"Movement {i+1} failed, stopping sequence")
-                break
-            
-            if i < len(angle_sequence) - 1 and pause_between > 0:
-                time.sleep(pause_between)
-        
-        logger.info("Sequence completed")
-    
     def emergency_stop(self):
         """Emergency stop all motors"""
         logger.warning("EMERGENCY STOP activated")
@@ -303,10 +335,27 @@ class StepperMotorController:
             self.motor_pins[motor_id]['step'].close()
 
 
-# Test script with random angles
+# Test script
 if __name__ == "__main__":
     controller = StepperMotorController()
     
+    # Define your custom RPM profiles for each motor
+    # These profiles will be used when `override_profiles` is provided
+    custom_profiles = [
+        # Motor 1: Max 40 RPM
+        {'start': 0.1, 'max': 40, 'min': 0.5, 'accel_fraction': 0.2, 'decel_fraction': 0.2},
+        # Motor 2: Max 250 RPM
+        {'start': 0.5, 'max': 300, 'min': 0.5, 'accel_fraction': 0.25, 'decel_fraction': 0.25},
+        # Motor 3: Max 250 RPM
+        {'start': 0.5, 'max': 300, 'min': 0.5, 'accel_fraction': 0.25, 'decel_fraction': 0.25},
+        # Motor 4: Max 80 RPM
+        {'start': 0.5, 'max': 40, 'min': 0.5, 'accel_fraction': 0.25, 'decel_fraction': 0.25},
+        # Motor 5: Max 80 RPM
+        {'start': 0.5, 'max': 40, 'min': 0.5, 'accel_fraction': 0.25, 'decel_fraction': 0.25},
+        # Motor 6: Max 80 RPM
+        {'start': 0.5, 'max': 40, 'min': 0.5, 'accel_fraction': 0.3, 'decel_fraction': 0.3}
+    ]
+
     try:
         # Display motor configuration and constraints
         print("\n=== Motor Configuration ===")
@@ -322,83 +371,40 @@ if __name__ == "__main__":
         controller.print_angle_constraints()
         
         # Set random seed for reproducible results (optional)
-        random.seed(42)  # Remove this line for truly random results each time
+        random.seed(78) # Comment out for truly random results each time
         
-        # Generate some example random angles
-        print("=== Example Random Angles ===")
-        for i in range(5):
-            random_angles = controller.generate_random_angles()
-            print(f"Random set {i+1}: {[f'M{j+1}:{random_angles[j]:>6.1f}°' for j in range(6)]}")
+        num_tests = 5
+        print(f"\n=== Running {num_tests} Random Tests with Custom RPM Profiles Automatically ===")
         
-        # RPM profiles for testing
-        individual_rpm_profiles = {
-            'start': 0.5,
-            'max': 20,
-            'min': 0.5,
-            'accel_fraction': 0.15,
-            'decel_fraction': 0.15
-        }
-        
-
-        # Example 2: Individual RPM profiles for each motor
-        individual_rpm_profiles = [
-            # Motor 1 - slow and steady
-            {'start': 0.5, 'max': 50, 'min': 0.5, 'accel_fraction': 0.2, 'decel_fraction': 0.2},
-            # Motor 2 - slow and steady
-            {'start': 0.5, 'max': 250, 'min': 0.5, 'accel_fraction': 0.2, 'decel_fraction': 0.2},
-            # Motor 3 - fast
-            {'start': 1.0, 'max': 250, 'min': 0.5, 'accel_fraction': 0.3, 'decel_fraction': 0.2},
-            # Motor 4 - medium speed
-            {'start': 0.8, 'max': 40, 'min': 0.5, 'accel_fraction': 0.2, 'decel_fraction': 0.2},
-            # Motor 5 - medium speed
-            {'start': 0.8, 'max': 40, 'min': 0.5, 'accel_fraction': 0.2, 'decel_fraction': 0.2},
-            # Motor 6 - fast
-            {'start': 1.0, 'max': 80, 'min': 0.5, 'accel_fraction': 0.2, 'decel_fraction': 0.2}
-        ]
-
-        # Generate and execute random test sequence
-        print("\n=== Random Test Sequence ===")
-        num_random_movements = 8
-        random_sequence = controller.generate_random_test_sequence(
-            num_movements=num_random_movements, 
-            include_home=False  # Set to True if you want to return home between each movement
-        )
-        
-        print(f"Generated sequence with {len(random_sequence)} positions:")
-        for i, angles in enumerate(random_sequence):
-            print(f"  Position {i+1}: {[f'M{j+1}:{angles[j]:>6.1f}°' for j in range(6)]}")
-        
-        # Ask user for confirmation
-        response = input(f"\nExecute random sequence? (y/n): ")
-        if response.lower() == 'y':
-            controller.move_sequence(random_sequence, individual_rpm_profiles, pause_between=1.0)
-        else:
-            print("Random sequence cancelled by user")
+        for i in range(num_tests):
+            print(f"\n--- Test Sequence {i+1}/{num_tests} ---")
             
-        # Alternative: Test individual random positions
-        print("\n=== Individual Random Position Tests ===")
-        for i in range(3):
+            # Generate new random angles for this test
             random_angles = controller.generate_random_angles()
-            print(f"\nTest {i+1}: {[f'M{j+1}:{random_angles[j]:>6.1f}°' for j in range(6)]}")
+            print(f"Target random angles: {[f'M{j+1}:{random_angles[j]:>6.1f}°' for j in range(6)]}")
+            print("Applying custom RPM profiles for this movement.")
             
-            response = input("Execute this position? (y/n/q): ")
-            if response.lower() == 'q':
-                break
-            elif response.lower() == 'y':
-                controller.move_to_angles(random_angles, individual_rpm_profiles)
-                time.sleep(0.5)
-                # Return to home
-                controller.move_to_angles([0.0] * 6, individual_rpm_profiles)
-                time.sleep(0.5)
+            # Move to the random angles using the custom_profiles
+            controller.move_to_angles_adaptive(random_angles, override_profiles=custom_profiles)
+            
+            # Add a pause after reaching the random position
+            time.sleep(0.05) 
+            
+            # Return to home position using the same custom profiles
+            print("\nReturning to home position (0.0° for all motors) with custom profiles...")
+        controller.move_to_angles_adaptive([0.0] * 6, override_profiles=custom_profiles)
+            
+            # Add a pause after returning home, before the next sequence
+        time.sleep(0.05) 
         
-        print(f"\nFinal position: {controller.current_angles}")
+        print(f"\nAll {num_tests} random test sequences completed. Final position: {controller.current_angles}")
         
     except KeyboardInterrupt:
-        print("\nProgram interrupted by user")
+        print("\nProgram interrupted by user. Initiating emergency stop.")
         controller.emergency_stop()
     except Exception as e:
-        print(f"Error: {e}")
+        print(f"An error occurred: {e}")
         logger.error(f"Unexpected error: {e}")
     finally:
         controller.cleanup()
-        print("Program ended")
+        print("Program ended and GPIO resources cleaned up.")
