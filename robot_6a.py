@@ -12,22 +12,22 @@ class StepperMotorController:
     def __init__(self):
         # Define pins for stepper motors
         self.motor_pins = {
-            1: {'dir': OutputDevice(24), 'step': OutputDevice(23)},
+            3: {'dir': OutputDevice(24), 'step': OutputDevice(23)},
             2: {'dir': OutputDevice(25), 'step': OutputDevice(12)},
-            3: {'dir': OutputDevice(6), 'step': OutputDevice(4)},
-            4: {'dir': OutputDevice(13), 'step': OutputDevice(17)},
-            5: {'dir': OutputDevice(19), 'step': OutputDevice(27)},
-            6: {'dir': OutputDevice(26), 'step': OutputDevice(22)}
+            1: {'dir': OutputDevice(6), 'step': OutputDevice(4)},
+            5: {'dir': OutputDevice(13), 'step': OutputDevice(17)},
+            6: {'dir': OutputDevice(19), 'step': OutputDevice(27)},
+            4: {'dir': OutputDevice(26), 'step': OutputDevice(22)}
         }
         
         # Motor specifications
         self.motor_specs = {
-            1: {'microstepping': 32, 'reduction': 36.5, 'max_rpm': 500},
             2: {'microstepping': 32, 'reduction': 36.5, 'max_rpm': 500},
-            3: {'microstepping': 4, 'reduction': 9.5, 'max_rpm': 50},
-            4: {'microstepping': 8, 'reduction': 6.5, 'max_rpm': 50},
-            5: {'microstepping': 16, 'reduction': 6.5, 'max_rpm': 50},
-            6: {'microstepping': 8, 'reduction': 6.5, 'max_rpm': 50}
+            3: {'microstepping': 32, 'reduction': 36.5, 'max_rpm': 500},
+            1: {'microstepping': 4, 'reduction': 9.5, 'max_rpm': 50},
+            5: {'microstepping': 8, 'reduction': 6.5, 'max_rpm': 50},
+            6: {'microstepping': 16, 'reduction': 6.5, 'max_rpm': 50},
+            4: {'microstepping': 8, 'reduction': 6.5, 'max_rpm': 50}
         }
         
         # State tracking
@@ -38,12 +38,12 @@ class StepperMotorController:
         
         # Safety limits (degrees)
         self.angle_limits = {
-            1: (-100, 10),
-            2: (-15, 60),
-            3: (-100, 100),
-            4: (-160, 160),
-            5: (-160, 160),
-            6: (-160, 160)
+            3: (-70, 0),
+            2: (0, 45),
+            1: (-60, 60),
+            5: (-15, 100),
+            6: (-90, 90),
+            4: (-80, 80)
         }
         
     def validate_angles(self, angles):
@@ -343,30 +343,45 @@ if __name__ == "__main__":
             # Motor 3 - fast
             {'start': 1.0, 'max': 40, 'min': 0.5, 'accel_fraction': 0.3, 'decel_fraction': 0.2},
             # Motor 4 - medium speed
-            {'start': 0.8, 'max': 80, 'min': 0.5, 'accel_fraction': 0.2, 'decel_fraction': 0.2},
+            {'start': 0.8, 'max': 40, 'min': 0.5, 'accel_fraction': 0.2, 'decel_fraction': 0.2},
             # Motor 5 - medium speed
-            {'start': 0.8, 'max': 80, 'min': 0.5, 'accel_fraction': 0.2, 'decel_fraction': 0.2},
+            {'start': 0.8, 'max': 40, 'min': 0.5, 'accel_fraction': 0.2, 'decel_fraction': 0.2},
             # Motor 6 - fast
             {'start': 1.0, 'max': 80, 'min': 0.5, 'accel_fraction': 0.2, 'decel_fraction': 0.2}
         ]
-        
+           
         # Test sequence - focusing on motors 2-6 with safe angles
         test_sequence = [
             [0, 0, 0, 0, 0, 0],           # Home position
-            [-70, 0, 0, 0, 0, 0],           # Home position
+
+             [45, 0, 0, 0, 0, 0],           # Home position
+             [0, 0, 0, 0, 0, 0],           # Home position
+
+             [0, 45, 0, 0, 0, 0],           # Home position
+             [0, 0, 0, 0, 0, 0],           # Home position
+
+             [0, 0, -45, 0, 0, 0],           # Home position
+             [0, 0, 0, 0, 0, 0],           # Home position
+
+            [0, 0, 0, -45, 0, 0],           # Home position
             [0, 0, 0, 0, 0, 0],           # Home position
-            [0, 50, 0, 0, 0, 0],           # Home position
+
+             [0, 0, 0, 0, 45, 0],           # Home position
+             [0, 0, 0, 0, 0, 0],           # Home position
+
+            [0, 0, 0, 0, 0, 45],           # Home position
             [0, 0, 0, 0, 0, 0],           # Home position
-            [-60, 30, 45, 45, 45, 45],          # Test motor 5
-            [0, 0, 0, 0, 0, 0],           # Return home
-            [-30, 20, -15, 20, 45, 90],      # Combined movement
-            [0, 0, 0, 0, 0, 0],           # Return home
-            [0, 0, 45, 0, 0, 0],          # Test motor 3
-            [0, 0, 0, 0, 0, 0],           # Return home
-            [0, 0, -60, 90, 0, 0],          # Test motor 4
-            [0, 0, 0, 0, 0, 0],           # Return home
-            [-55, 35, -60, 90, 90, 90],          # Test motor 6
-            [0, 0, 0, 0, 0, 0]            # Return home
+
+            # [-60, 30, 45, 45, 45, 45],          # Test motor 5
+            # [0, 0, 0, 0, 0, 0],           # Return home
+            # [-30, 20, -15, 20, 45, 90],      # Combined movement
+            # [0, 0, 0, 0, 0, 0],           # Return home
+            # [0, 0, 45, 0, 0, 0],          # Test motor 3
+            # [0, 0, 0, 0, 0, 0],           # Return home
+            # [0, 0, -60, 90, 0, 0],          # Test motor 4
+            # [0, 0, 0, 0, 0, 0],           # Return home
+            # [-55, 35, -60, 90, 90, 90],          # Test motor 6
+            # [0, 0, 0, 0, 0, 0]            # Return home
         ]
         
         print("\n=== Testing with Individual Motor RPM Profiles ===")
